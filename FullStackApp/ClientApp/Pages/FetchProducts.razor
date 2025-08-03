@@ -1,0 +1,74 @@
+﻿@page "/fetchproducts"
+@using System.Text.Json
+@inject HttpClient Http
+
+<h3>Product List</h3>
+
+<ul>
+    @if (products != null)
+    {
+        foreach (var product in products)
+        {
+            <li>@product.Name - $@product.Price</li>
+        }
+    }
+    else
+    {
+        <li>Loading...</li>
+    }
+</ul>
+
+@code {
+    private Product[]? products;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var response = await Http.GetAsync("api/productlist", cts.Token);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
+                try
+                {
+                    products = System.Text.Json.JsonSerializer.Deserialize<Product[]>(json, new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        }) ?? Array.Empty<Product>();
+                }
+                catch (JsonException jsonEx)
+                {
+                    Console.WriteLine($"Malformed JSON: {jsonEx.Message}");
+                    products = Array.Empty<Product>();
+                }
+            }
+            else
+            {
+                Console.WriteLine($"API response error: {response.StatusCode}");
+                products = Array.Empty<Product>();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("API request timed out.");
+            products = Array.Empty<Product>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching products: {ex.Message}");
+            products = Array.Empty<Product>();
+        }
+    }
+
+
+
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public double Price { get; set; }
+        public int Stock { get; set; }
+    }
+}
